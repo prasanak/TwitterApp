@@ -12,6 +12,11 @@ NSString * const kTwitterConsumerKey = @"jY8wiVYgMaK5X6e0OD3PzCGyD";
 NSString * const kTwitterConsumerSecret = @"UyYHEihHgqSrdms9S53DiMldar6V3QJC3irJipZIs6ys5xUOdm";
 NSString * const kTwitterBaseUrl = @"https://api.twitter.com/";
 
+@interface TwitterClient ()
+
+@property (nonatomic, strong) void (^loginCompletion)(User *user, NSError *error);
+
+@end
 
 @implementation TwitterClient
 
@@ -29,6 +34,55 @@ NSString * const kTwitterBaseUrl = @"https://api.twitter.com/";
     
     
     return instance;
+}
+
+- (void)loginWithCompletion:(void (^)(User *user, NSError *error))completion {
+    
+    self.loginCompletion = completion;
+    
+    [self.requestSerializer removeAccessToken];
+
+    [self fetchRequestTokenWithPath:@"oauth/request_token" method:@"GET" callbackURL:[NSURL URLWithString:@"prasannatwitterapp://oath"] scope:nil success:^(BDBOAuth1Credential *requestToken) {
+        NSLog(@"Got the request token");
+        
+        NSURL *authURL = [NSURL URLWithString:[NSString stringWithFormat:@"https://api.twitter.com/oauth/authorize?oauth_token=%@", requestToken.token]];
+        
+        [[UIApplication sharedApplication] openURL:authURL];
+    } failure:^(NSError *error) {
+        NSLog(@"failed to get the request token");
+        self.loginCompletion(nil, error);
+
+    }];
+    
+}
+
+- (void)openURL:(NSURL*)url {
+    
+    [self fetchAccessTokenWithPath:@"oauth/access_token" method:@"POST" requestToken:[BDBOAuth1Credential credentialWithQueryString:url.query] success:^(BDBOAuth1Credential *accessToken) {
+        NSLog(@"Got the access token");
+        
+        [self.requestSerializer saveAccessToken:accessToken];
+        
+        [self GET:@"1.1/account/verify_credentials.json" parameters:nil success:^(AFHTTPRequestOperation *operation, id responseObject) {
+            //NSLog(@"Current user: %@", responseObject);
+            
+            User *user = [[User alloc] initWithDictionary:responseObject];
+            NSLog(@"Current user: %@", user.name);
+            self.loginCompletion(user, nil);
+            
+        } failure:^(AFHTTPRequestOperation *operation, NSError *error) {
+            NSLog(@"Failed to get current user");
+            self.loginCompletion(nil, error);
+        }];
+        
+        
+    } failure:^(NSError *error) {
+        NSLog(@"Failed to get the access token");
+        self.loginCompletion(nil, error);
+    }];
+    
+
+    
 }
 
 @end
