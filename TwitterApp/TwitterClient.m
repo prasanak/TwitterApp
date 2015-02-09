@@ -7,6 +7,7 @@
 //
 
 #import "TwitterClient.h"
+#import "Tweet.h"
 
 NSString * const kTwitterConsumerKey = @"jY8wiVYgMaK5X6e0OD3PzCGyD";
 NSString * const kTwitterConsumerSecret = @"UyYHEihHgqSrdms9S53DiMldar6V3QJC3irJipZIs6ys5xUOdm";
@@ -30,8 +31,7 @@ NSString * const kTwitterBaseUrl = @"https://api.twitter.com/";
             
         }
         
-    });
-    
+    });    
     
     return instance;
 }
@@ -49,7 +49,7 @@ NSString * const kTwitterBaseUrl = @"https://api.twitter.com/";
         
         [[UIApplication sharedApplication] openURL:authURL];
     } failure:^(NSError *error) {
-        NSLog(@"failed to get the request token");
+        NSLog(@"failed to get the request token: %@", error);
         self.loginCompletion(nil, error);
 
     }];
@@ -67,6 +67,9 @@ NSString * const kTwitterBaseUrl = @"https://api.twitter.com/";
             //NSLog(@"Current user: %@", responseObject);
             
             User *user = [[User alloc] initWithDictionary:responseObject];
+            
+            [User setCurrentUser:user];
+            
             NSLog(@"Current user: %@", user.name);
             self.loginCompletion(user, nil);
             
@@ -80,9 +83,17 @@ NSString * const kTwitterBaseUrl = @"https://api.twitter.com/";
         NSLog(@"Failed to get the access token");
         self.loginCompletion(nil, error);
     }];
-    
+}
 
+- (void)homeTimelineWithParams:(NSDictionary *)params completion:(void (^)(NSArray *tweets, NSError *error))completion {
+    [self GET:@"1.1/statuses/home_timeline.json" parameters:params success:^(AFHTTPRequestOperation *operation, id responseObject) {
+        NSArray *tweets = [Tweet tweetsWithArray:responseObject];
+        completion(tweets, nil);
+    } failure:^(AFHTTPRequestOperation *operation, NSError *error) {
+        completion(nil, error);
+    }];
     
 }
+
 
 @end
